@@ -1,4 +1,4 @@
-name: Update release downloads
+name: Update project stats
 
 on:
   schedule:
@@ -29,18 +29,18 @@ jobs:
           python-version: "3.12"
       - name: Test counter
         run: python -m unittest discover -s scripts -p "test_*.py"
-      - name: Count public release downloads
+      - name: Count public release downloads and stars
         env:
           GH_TOKEN: ${{ github.token }}
         run: python scripts/update_downloads.py
       - name: Publish badge data
         run: |
-          git add badges/release-downloads.json
+          git add badges/release-downloads.json badges/project-stars.json
           if git diff --cached --quiet; then
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Update release download count"
+          git commit -m "Update project stats"
           git pull --rebase origin main
           git push

@@ -6,6 +6,7 @@ from urllib.request import Request, urlopen
 
 OWNERS = ("mstrhakr", "Printmaster-Org", "Szittai-Cloud")
 OUTPUT = Path(__file__).resolve().parents[1] / "badges" / "release-downloads.json"
+STARS_OUTPUT = OUTPUT.with_name("project-stars.json")
 
 
 def request_json(path):
@@ -34,12 +35,19 @@ def paginate(path):
         page += 1
 
 
-def count_downloads():
-    repositories = set()
+def count_totals():
+    repositories = {}
     for owner in OWNERS:
         for repository in paginate(f"/users/{owner}/repos"):
             if not repository["private"]:
-                repositories.add(repository["full_name"])
+                repositories[repository["full_name"]] = repository
+
+    stars = 0
+    for repository in repositories.values():
+        count = repository["stargazers_count"]
+        if type(count) is not int or count < 0:
+            raise ValueError(f"Invalid star count in {repository['full_name']}: {count!r}")
+        stars += count
 
     total = 0
     for repository in sorted(repositories):
@@ -51,20 +59,24 @@ def count_downloads():
                 if type(count) is not int or count < 0:
                     raise ValueError(f"Invalid download count in {repository}: {count!r}")
                 total += count
-    return total
+    return total, stars
 
 
-def update_badge(output=OUTPUT):
-    total = count_downloads()
-    badge = {
-        "schemaVersion": 1,
-        "label": "Release downloads",
-        "message": f"{total:,}",
-        "color": "58a6ff",
-    }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(badge, indent=2) + "\n", encoding="utf-8")
-    print(f"Release downloads across {', '.join(OWNERS)}: {total:,}")
+def update_badge(output=OUTPUT, stars_output=STARS_OUTPUT):
+    total, stars = count_totals()
+    for path, label, count in (
+        (output, "Release downloads", total),
+        (stars_output, "Project stars", stars),
+    ):
+        badge = {
+            "schemaVersion": 1,
+            "label": label,
+            "message": f"{count:,}",
+            "color": "58a6ff",
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(badge, indent=2) + "\n", encoding="utf-8")
+        print(f"{label} across {', '.join(OWNERS)}: {count:,}")
 
 
 if __name__ == "__main__":
