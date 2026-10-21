@@ -1,0 +1,46 @@
+name: Update release downloads
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/update_downloads.py
+      - scripts/test_update_downloads.py
+      - .github/workflows/release-downloads.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-downloads
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test counter
+        run: python -m unittest discover -s scripts -p "test_*.py"
+      - name: Count public release downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/update_downloads.py
+      - name: Publish badge data
+        run: |
+          git add badges/release-downloads.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update release download count"
+          git pull --rebase origin main
+          git push
